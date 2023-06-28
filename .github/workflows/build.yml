@@ -19,158 +19,110 @@ env:
   ARIA2_REF: AutoBuild
 
 jobs:
-  create_release:
-    runs-on: windows-2019
-    steps:
-      # delete old release
-      - uses: dev-drprasad/delete-tag-and-release@v1.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          delete_release: true # default: false
-          tag_name: ${{ env.ARIA2_REF }}-Nightly # tag name to delete
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ env.ARIA2_REF }}-Nightly
-          release_name: ${{ env.ARIA2_REF }}-Nightly
-          body: |
-            ${{ env.ARIA2_REF }}-Nightly
-          draft: false
-          prerelease: true
-
-  build-windows:
-    needs: create_release
-    env:
-      HOST: x86_64-w64-mingw32
-    runs-on: ubuntu-22.04
+  w-build:
+    name: build_windows
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3.5.2
       - name: Setup
         run: |
-          sudo apt-get update && \
-          sudo apt-get install -y \
-          make binutils autoconf automake autotools-dev libtool \
-          patch ca-certificates libcppunit-dev autopoint  lzip \
-          pkg-config curl dpkg-dev gcc-mingw-w64 g++-mingw-w64 && \
-          curl -L -O https://gmplib.org/download/gmp/gmp-6.2.1.tar.lz && \
-          curl -L -O https://github.com/libexpat/libexpat/releases/download/R_2_4_1/expat-2.4.1.tar.bz2 && \
-          curl -L -O https://www.sqlite.org/2021/sqlite-autoconf-3360000.tar.gz && \
-          curl -L -O https://zlib.net/fossils/zlib-1.2.11.tar.gz && \
-          curl -L -O https://c-ares.haxx.se/download/c-ares-1.17.2.tar.gz && \
-          curl -L -O https://www.libssh2.org/download/libssh2-1.9.0.tar.gz && \
-          curl -L -O https://github.com/libssh2/libssh2/commit/ba149e804ef653cc05ed9803dfc94519ce9328f7.patch
-      - name: Apply patch
-        run: |
           sudo git apply patch/*.patch
-      - name: Build gmp
+
+          sudo apt update
+          # # fix:
+          # # The following packages have unmet dependencies:...
+          sudo apt-get install aptitude
+          export packages=$packages"autopoint automake autotools-dev libtool gettext "
+          export packages=$packages"build-essential libelf-dev binutils-dev libdwarf-dev gcc g++ git "
+          export packages=$packages$(apt-cache search -n libc6-dev-amd64 | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n libssl dev | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n libxml2 dev | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n zlib | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n mingw-w64 | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n dpkg-dev | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n pkg-config | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n openssl dev | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n nettle dev | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n gcrypt dev | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n gnutls dev | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n gmp dev | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n glibc | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n unistring dev | cut -d " " -f 1 | tr "\n" " ")
+          export packages=$packages$(apt-cache search -n p11-kit | cut -d " " -f 1 | tr "\n" " ")
+          # export packages=$packages$(apt-cache search -n libssh2 dev | cut -d " " -f 1 | tr "\n" " ")
+          # export packages=$packages$(apt-cache search -n libsqlite3 dev | cut -d " " -f 1 | tr "\n" " ")
+          # export packages=$packages$(apt-cache search -n expat | cut -d " " -f 1 | tr "\n" " ")
+          # export packages=$packages$(apt-cache search -n c-ares | cut -d " " -f 1 | tr "\n" " ")
+          # export packages=$packages$(apt-cache search -n libcppunit dev | cut -d " " -f 1 | tr "\n" " ")
+          sudo aptitude -y install $packages
+          export HOST=x86_64-w64-mingw32
+          export PREFIX=/usr/$HOST
+          export pwd=$(pwd)
+
+          git clone --depth=1 https://github.com/c-ares/c-ares.git tmp
+          cd tmp
+          autoreconf -fi
+          CC=$HOST-gcc CXX=$HOST-g++ ./configure --host=$HOST --prefix=$PREFIX --enable-shared=no
+          make
+          sudo make install
+          cd $pwd
+          rm -rf tmp
+          git clone --depth=1 https://github.com/libexpat/libexpat.git tmp
+          cd tmp/expat
+          ./buildconf.sh
+          CC=$HOST-gcc CXX=$HOST-g++ ./configure --host=$HOST --prefix=$PREFIX --enable-shared=no
+          make
+          sudo make install
+          cd $pwd
+          rm -rf tmp
+          git clone --depth=1 https://github.com/sqlite/sqlite.git tmp
+          cd tmp
+          ./configure
+          make amalgamation-tarball
+          cd mkpkg_tmp_dir/sqlite-autoconf*
+          CC=$HOST-gcc CXX=$HOST-g++ ./configure --host=$HOST --prefix=$PREFIX --enable-shared=no
+          make
+          sudo make install
+          cd $pwd
+          rm -rf tmp
+          curl -o tmp.tar.gz -L "https://downloads.sourceforge.net/project/cppunit/cppunit/1.12.1/cppunit-1.12.1.tar.gz?ts=1616748686&r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fcppunit%2Ffiles%2Fcppunit%2F1.12.1%2Fcppunit-1.12.1.tar.gz%2Fdownload"
+          tar -zxvf tmp.tar.gz
+          cd cppunit-1.12.1/
+          CC=$HOST-gcc CXX=$HOST-g++ ./configure --host=$HOST --prefix=$PREFIX --enable-shared=no
+          make
+          sudo make install
+          cd $pwd
+          rm -rf tmp.tar.gz cppunit-1.12.1
+      - name: Build
         run: |
-          tar xf gmp-6.2.1.tar.lz && \
-          cd gmp-6.2.1 && \
+          export HOST=x86_64-w64-mingw32
+          export PREFIX=/usr/$HOST
+
+          autoreconf -i
+
+          # https://github.com/c-ares/c-ares/blob/master/INSTALL.md#important-static-c-ares-usage-note
           ./configure \
-          --disable-shared \
-          --enable-static \
-          --prefix=/usr/local/$HOST \
-          --host=$HOST \
-          --disable-cxx \
-          --enable-fat \
-          CFLAGS="-mtune=generic -O2 -g0" && \
-          sudo make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" install
-      - name: Build expat
-        run: |
-          tar xf expat-2.4.1.tar.bz2 && \
-          cd expat-2.4.1 && \
-          ./configure \
-          --disable-shared \
-          --enable-static \
-          --prefix=/usr/local/$HOST \
-          --host=$HOST \
-          --build=`dpkg-architecture -qDEB_BUILD_GNU_TYPE` && \
-          sudo make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" install
-      - name: Build sqlite
-        run: |
-          tar xzvf sqlite-autoconf-3360000.tar.gz && \
-          cd sqlite-autoconf-3360000 && \
-          ./configure \
-          --disable-shared \
-          --enable-static \
-          --prefix=/usr/local/$HOST \
-          --host=$HOST \
-          --build=`dpkg-architecture -qDEB_BUILD_GNU_TYPE` && \
-          sudo make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" install
-      - name: Build zlib
-        run: |
-          tar xf zlib-1.2.11.tar.gz && \
-          cd zlib-1.2.11 && \
-          CC=$HOST-gcc \
-          AR=$HOST-ar \
-          LD=$HOST-ld \
-          RANLIB=$HOST-ranlib \
-          STRIP=$HOST-strip \
-          ./configure \
-          --prefix=/usr/local/$HOST \
-          --libdir=/usr/local/$HOST/lib \
-          --includedir=/usr/local/$HOST/include \
-          --static && \
-          sudo make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" install
-      - name: Build c-ares
-        run: |
-          tar xf c-ares-1.17.2.tar.gz && \
-          cd c-ares-1.17.2 && \
-          ./configure \
-          --disable-shared \
-          --enable-static \
-          --without-random \
-          --prefix=/usr/local/$HOST \
-          --host=$HOST \
-          --build=`dpkg-architecture -qDEB_BUILD_GNU_TYPE` \
-          LIBS="-lws2_32" && \
-          sudo make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" install
-      - name: Build libssh
-        run: |
-          tar xf libssh2-1.9.0.tar.gz && \
-          cd libssh2-1.9.0 && \
-          patch -p1 < ../ba149e804ef653cc05ed9803dfc94519ce9328f7.patch && \
-          ./configure \
-          --disable-shared \
-          --enable-static \
-          --prefix=/usr/local/$HOST \
-          --host=$HOST \
-          --build=`dpkg-architecture -qDEB_BUILD_GNU_TYPE` \
-          --without-openssl \
-          --with-wincng \
-          LIBS="-lws2_32" && \
-          sudo make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" install
-      - name: Configure autotools
-        run: |
-          autoreconf -i && \
-          ./mingw-config ARIA2_STATIC=yes
-      - name: Build aria2
-        run: |
+              --host=$HOST \
+              --prefix=$PREFIX \
+              ARIA2_STATIC=yes \
+              CFLAGS="-DCARES_STATICLIB" \
+              CPPFLAGS="-I$PREFIX/include" \
+              PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
           sudo make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" && \
           sudo $HOST-strip src/aria2c.exe
-          sudo cp src/aria2c.exe src/aria2c-release-Windows-x86_64.exe
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
+      - name: Upload Asset
+        uses: actions/upload-artifact@v2
         with:
-          tag_name: ${{ env.ARIA2_REF }}-Nightly
-          name: ${{ env.ARIA2_REF }}-Nightly
-          body: TODO New Release.
-          draft: false  # 是否是草稿
-          prerelease: true # 是否是预览版
-          files: src/aria2c-release-Windows-x86_64.exe
+          name: aria2c-windows-x86_64.exe
+          path: src/aria2c.exe
 
   build:
-    needs: create_release
     strategy:
       matrix:
         os: [ubuntu-22.04, macos-11]
         # os: [macos-11]
-        compiler: [gcc, clang]
-        # compiler: [gcc]
+        # compiler: [gcc, clang]
+        compiler: [gcc]
 
     runs-on: ${{ matrix.os }}
 
@@ -310,13 +262,8 @@ jobs:
         run: |
           make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" && \
           strip src/aria2c
-          cp src/aria2c src/aria2c-release-$(uname -s)-$(uname -m)
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
+      - name: Upload Asset
+        uses: actions/upload-artifact@v2
         with:
-          tag_name: ${{ env.ARIA2_REF }}-Nightly
-          name: ${{ env.ARIA2_REF }}-Nightly
-          body: TODO New Release.
-          draft: false  # 是否是草稿
-          prerelease: true # 是否是预览版
-          files: src/aria2c-release-*
+          name: aria2c-${{ matrix.os }}-${{ matrix.compiler }}
+          path: src/aria2c
