@@ -222,7 +222,7 @@ jobs:
         run: |
           tar xf openssl-1.1.1g.tar.gz && \
           cd openssl-1.1.1g && \
-          ./config no-shared zlib \
+          ./config no-shared zlib --prefix=/tmp/openssl \
           CFLAGS="-mtune=generic -O2 -g0" && \
           sudo make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" && sudo make install
       - name: Build libssh
@@ -235,6 +235,7 @@ jobs:
           --enable-static \
           --build=`dpkg-architecture -qDEB_BUILD_GNU_TYPE` \
           --with-crypto=openssl \
+          --with-libssl-prefix=/tmp/openssl/lib \
           --with-wincng && \
           sudo make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" install
       - name: Configure autotools (Linux)
