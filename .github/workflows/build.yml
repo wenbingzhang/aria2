@@ -6,14 +6,14 @@ on:
     paths-ignore:
       - "README.md"
       - "LICENSE"
-  pull_request:
-    branches: [master]
-    paths-ignore:
-      - "README.md"
-      - "LICENSE"
-  workflow_dispatch:
-  schedule:
-    - cron: "0 22 * * *" # Runs at 22:00 UTC every day
+  # pull_request:
+  #   branches: [master]
+  #   paths-ignore:
+  #     - "README.md"
+  #     - "LICENSE"
+  # workflow_dispatch:
+  # schedule:
+  #   - cron: "0 22 * * *" # Runs at 22:00 UTC every day
 
 env:
   ARIA2_REF: AutoBuild
