@@ -489,6 +489,10 @@ if test "x$with_libssh2" = "xyes"; then
   PKG_CHECK_MODULES([LIBSSH2], [libssh2], [have_libssh2=yes], [have_libssh2=no])
   if test "x$have_libssh2" = "xyes"; then
     AC_DEFINE([HAVE_LIBSSH2], [1], [Define to 1 if you have libssh2.])
+
+    if test "x$ARIA2_STATIC" = "xyes"; then
+      LIBSSH2_CFLAGS="-DLIBSSH2_API= $LIBSSH2_CFLAGS"
+    fi
   else
     AC_MSG_WARN([$LIBSSH2_PKG_ERRORS])
     if test "x$with_libssh2_requested" = "xyes"; then
@@ -930,17 +934,9 @@ case "$host" in
     ;;
 esac
 
-case "$host" in
-  *android*)
-    # timegm is not declared with Android NDK r12b
-    AM_CONDITIONAL([HAVE_TIMEGM], false)
-    ;;
-  *)
-    AC_CHECK_FUNCS([timegm],
-        [AM_CONDITIONAL([HAVE_TIMEGM], true)],
-        [AM_CONDITIONAL([HAVE_TIMEGM], false)])
-    ;;
-esac
+AC_CHECK_FUNCS([timegm],
+    [AM_CONDITIONAL([HAVE_TIMEGM], true)],
+    [AM_CONDITIONAL([HAVE_TIMEGM], false)])
 
 AC_CHECK_FUNCS([port_associate], [have_port_associate=yes])
 AM_CONDITIONAL([HAVE_PORT_ASSOCIATE], [test "x$have_port_associate" = "xyes"])
