@@ -1,4 +1,4 @@
-name: AutoBuild
+name: pc
 
 on:
   push:
@@ -16,7 +16,7 @@ on:
   #   - cron: "0 22 * * *" # Runs at 22:00 UTC every day
 
 env:
-  ARIA2_REF: AutoBuild
+  ARIA2_REF: pc
   PREFIX: /opt/aria2/build_libs
 
 jobs:
@@ -60,7 +60,7 @@ jobs:
           export PREFIX=/usr/$HOST
           export pwd=$(pwd)
 
-          git clone --depth=1 https://github.com/c-ares/c-ares.git tmp
+          git clone --depth=1 --branch cares-1_17_2 https://github.com/c-ares/c-ares.git tmp
           cd tmp
           autoreconf -fi
           CC=$HOST-gcc CXX=$HOST-g++ ./configure --host=$HOST --prefix=$PREFIX --enable-shared=no
@@ -68,7 +68,7 @@ jobs:
           sudo make install
           cd $pwd
           rm -rf tmp
-          git clone --depth=1 https://github.com/libexpat/libexpat.git tmp
+          git clone --depth=1 --branch R_2_4_9 https://github.com/libexpat/libexpat.git tmp
           cd tmp/expat
           ./buildconf.sh
           CC=$HOST-gcc CXX=$HOST-g++ ./configure --host=$HOST --prefix=$PREFIX --enable-shared=no
@@ -76,7 +76,7 @@ jobs:
           sudo make install
           cd $pwd
           rm -rf tmp
-          git clone --depth=1 https://github.com/sqlite/sqlite.git tmp
+          git clone --depth=1 --branch version-3.41.2 https://github.com/sqlite/sqlite.git tmp
           cd tmp
           ./configure
           make amalgamation-tarball
